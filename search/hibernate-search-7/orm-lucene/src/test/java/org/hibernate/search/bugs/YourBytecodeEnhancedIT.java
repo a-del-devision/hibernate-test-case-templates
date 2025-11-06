@@ -3,6 +3,7 @@ package org.hibernate.search.bugs;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.List;
 
 import org.hibernate.Session;
@@ -23,16 +24,20 @@ public class YourBytecodeEnhancedIT extends BaseCoreFunctionalTestCase {
 
 	@Override
 	public Class<?>[] getAnnotatedClasses() {
-		return new Class<?>[] { YourAnnotatedEntity.class };
+        return new Class<?>[]{MapsIdJoinColumnChild.class, MapsIdChild.class, JoinColumnChild.class, Tag.class, Parent.class};
 	}
 
 	@Test
 	public void testYourBug() {
 		try ( Session s = openSession() ) {
-			YourAnnotatedEntity yourEntity1 = new YourAnnotatedEntity( 1L, "Jane Smith" );
-			YourAnnotatedEntity yourEntity2 = new YourAnnotatedEntity( 2L, "John Doe" );
+            Parent parent1 = new Parent(1L, "Smiths");
+            Parent parent2 = new Parent(2L, "Does");
+            MapsIdJoinColumnChild yourEntity1 = new MapsIdJoinColumnChild(parent1, "Jane Smith", Collections.emptySet());
+            MapsIdJoinColumnChild yourEntity2 = new MapsIdJoinColumnChild(parent2, "John Doe", Collections.emptySet());
 
 			Transaction tx = s.beginTransaction();
+            s.persist( parent1 );
+            s.persist( parent2 );
 			s.persist( yourEntity1 );
 			s.persist( yourEntity2 );
 			tx.commit();
@@ -41,20 +46,20 @@ public class YourBytecodeEnhancedIT extends BaseCoreFunctionalTestCase {
 		try ( Session session = openSession() ) {
 			SearchSession searchSession = Search.session( session );
 
-			List<YourAnnotatedEntity> hits = searchSession.search( YourAnnotatedEntity.class )
+			List<MapsIdJoinColumnChild> hits = searchSession.search( MapsIdJoinColumnChild.class )
 					.where( f -> f.match().field( "name" ).matching( "smith" ) )
 					.fetchHits( 20 );
 
 			assertThat( hits )
 					.hasSize( 1 )
-					.element( 0 ).extracting( YourAnnotatedEntity::getId )
+					.element( 0 ).extracting( MapsIdJoinColumnChild::getId )
 					.isEqualTo( 1L );
 		}
 	}
 
 	@Test
 	public void testBytecodeEnhancement() {
-		assertThat( YourAnnotatedEntity.class.getDeclaredMethods() )
+		assertThat( MapsIdJoinColumnChild.class.getDeclaredMethods() )
 				.extracting( Method::getName )
 				.anyMatch( name -> name.startsWith( "$$_hibernate_" ) );
 	}
